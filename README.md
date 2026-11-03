@@ -1,5 +1,7 @@
 # Qt Todo demo
 
+[![CI](https://github.com/mateusz-fejcher7/qt-cicd-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/mateusz-fejcher7/qt-cicd-demo/actions/workflows/ci.yml)
+
 A small todo app built with Qt Quick (QML) and C++, using Qt 6.12.
 
 ## Build
