@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[])
 {
-    QGuiApplication app(argc, argv);
+    QGuiApplicatio app(argc, argv);
 
     QQmlApplicationEngine engine;
     QObject::connect(
