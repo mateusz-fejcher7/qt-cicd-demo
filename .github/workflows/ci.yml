@@ -6,24 +6,71 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  IMAGE: ghcr.io/mateusz-fejcher7/qt-cicd-demo/qt-ci
+
 jobs:
-  build:
+  # Make sure the image for this commit's ci-docker/ exists on GHCR
+  image:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      ref: ${{ steps.tag.outputs.ref }}
 
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: "6.12.0"
-          cache: true
+      - name: Compute image tag from ci-docker/
+        id: tag
+        env:
+          HASH: ${{ hashFiles('ci-docker/**') }}
+        run: echo "ref=$IMAGE:${HASH::12}" >> "$GITHUB_OUTPUT"
 
-      - name: Install build tools
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if the image exists
+        id: check
+        env:
+          REF: ${{ steps.tag.outputs.ref }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev
+          if docker manifest inspect "$REF" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push the image
+        if: steps.check.outputs.exists == 'false'
+        uses: docker/build-push-action@v7
+        with:
+          context: ci-docker
+          push: true
+          tags: ${{ steps.tag.outputs.ref }}
+
+  # Build the app inside that image
+  build:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.ref }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
